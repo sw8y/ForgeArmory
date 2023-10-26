@@ -21,17 +21,17 @@ An example of TTP metadata is shown below.
 
 ```yaml
 ---
-name: Disable system security updates
+name: Leverage mdfind to search for aws credentials on disk.
 description: |
-  This TTP disables the automatic installation of macOS security updates.
+  This TTP runs a search using mdfind to search for AKIA strings in files,
+  which would likely indicate that the file is an aws key.
 mitre:
   tactics:
-    - T0005 Defense Evasion
+    - TA0006 Credential Access
   techniques:
-    - T1562 Impair Defenses
+    - T1552 Unsecured Credentials
   subtechniques:
-    - "T1562.001 Impair Defenses: Disable or Modify Tools"
-
+    - "T1552.001 Unsecured Credentials: Credentials In Files"
 ```
 
 ### Arguments
@@ -51,6 +51,8 @@ args:
 steps:
   - name: print_args
     inline: |
+      set -e
+
       echo "hi! You passed the message: {{ .Args.a_message }}"
       echo "You passed the number: {{ .Args.a_number }}"
       echo "has_a_default has the value: '{{ .Args.has_a_default }}'"
@@ -158,12 +160,16 @@ previous steps.
 steps:
   - name: disable-updates
     inline: |
+      set -e
+
       echo -e "===> Disabling automatic installation of security updates..."
       sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate.plist CriticalUpdateInstall -bool NO
       echo "[+] DONE!"
 
     cleanup:
       inline: |
+        set -e
+
         echo -e "===> Enabling automatic installation of security updates..."
         sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate.plist CriticalUpdateInstall -bool YES
         echo "[+] DONE!"
@@ -183,3 +189,13 @@ steps:
       inline: |
         echo "No cleanup needed, as this TTP simply dumped clipboard contents to stdout."
 ```
+
+### Pre-Commit Hooks
+
+Every so often, we introduce pre-commit hooks to ensure that
+the developer experience is easy and has a low barrier to entry.
+
+However, some hooks may introduce unnecessary overhead.
+To address this, all new pre-commit hooks will undergo a one-month
+trial period. If they hinder the developer experience during this time,
+we will remove them.

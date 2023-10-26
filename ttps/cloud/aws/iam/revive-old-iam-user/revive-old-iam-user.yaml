@@ -2,9 +2,14 @@
 name: revive-old-iam-user
 description: Add an access key to a previously dormant IAM user.
 args:
-  - name: cleanup
   - name: detect
+    default: true
   - name: user
+mitre:
+  tactics:
+    - TA0003 Persistence
+  techniques:
+    - T1098 Account Manipulation
 
 steps:
   - name: ensure-aws-creds-present
@@ -15,7 +20,6 @@ steps:
           echo "Error: AWS_DEFAULT_REGION must be set."
           exit 1
       fi
-
       if [[ -n "${AWS_ACCESS_KEY_ID}" && -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
           if [[ -z "${AWS_SESSION_TOKEN}" ]]; then
             echo "Warning: AWS_SESSION_TOKEN is not set with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
@@ -79,9 +83,13 @@ steps:
 
       USER="{{ .Args.user }}"
       new_key_id=$(create_key $USER)
-      if [[ "{{ .Args.cleanup }}" == true ]]; then
+
+    cleanup:
+      name: cleanup
+      inline: |
+        set -e
+
         delete_key $USER $new_key_id
-      fi
 
   - name: check-detection
     inline: |
@@ -110,7 +118,9 @@ steps:
         for event_name in "${EVENT_NAMES[@]}"; do
             EVENTS=$(aws cloudtrail lookup-events \
                 --lookup-attributes AttributeKey=EventName,AttributeValue=$event_name \
-                --start-time $START_TIME --end-time $END_TIME)
+                --start-time $START_TIME \
+                --end-time $END_TIME \
+                --region us-east-1)
 
             # If there are recent events
             if [[ "$(echo "$EVENTS" | jq -r '.Events | length')" -gt 0 ]]; then

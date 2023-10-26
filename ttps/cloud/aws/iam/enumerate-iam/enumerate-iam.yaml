@@ -5,10 +5,17 @@ description: |
   brute force using the
   [enumerate-iam](https://github.com/andresriancho/enumerate-iam) tool.
 args:
-  - name: cleanup
   - name: detect
+    default: true
   - name: eiam_path
+    default: /tmp/enumerate-iam
   - name: extended_scan
+    default: false
+mitre:
+  tactics:
+    - TA0007 Discovery
+  techniques:
+    - T1082 System Information Discovery
 
 steps:
   - name: ensure-aws-creds-present
@@ -74,7 +81,7 @@ steps:
           # Get latest APIs
           echo "Info: Extended scan specified - getting latest AWS API endpoints"
           git clone https://github.com/aws/aws-sdk-js.git {{ .Args.eiam_path }}/enumerate_iam/aws-sdk-js
-          pushd {{ .Args.eiam_path }} || exit 1
+          pushd {{ .Args.eiam_path }}/enumerate_iam || exit 1
           python3 generate_bruteforce_tests.py
           popd || exit 1
       fi
@@ -108,13 +115,11 @@ steps:
       inline: |
         set -e
 
-        if [[ "{{ .Args.cleanup }}" == true ]]; then
-          echo "Uninstalling Python packages..."
-          cd {{ .Args.eiam_path }} && pip3 uninstall -y -r requirements.txt
-          if [[ -d "{{ .Args.eiam_path }}" ]]; then
-              echo "Cleaning up enumerate-iam repository..."
-              rm -rf {{ .Args.eiam_path }}
-          fi
+        echo "Uninstalling Python packages..."
+        cd {{ .Args.eiam_path }} && pip3 uninstall -y -r requirements.txt
+        if [[ -d "{{ .Args.eiam_path }}" ]]; then
+            echo "Cleaning up enumerate-iam repository..."
+            rm -rf {{ .Args.eiam_path }}
         fi
 
   - name: check-detection
@@ -144,7 +149,9 @@ steps:
         for api_call in "${API_CALLS[@]}"; do
           EVENTS=$(aws cloudtrail lookup-events \
             --lookup-attributes AttributeKey=EventName,AttributeValue=$api_call \
-            --start-time $START_TIME --end-time $END_TIME)
+            --start-time $START_TIME \
+            --end-time $END_TIME \
+            --region us-east-1)
 
           # Check if api_call event exists in the events
           if echo "$EVENTS" | jq -e '.Events[] | select(.EventName=="'$api_call'")' > /dev/null; then
